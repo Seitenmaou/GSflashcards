@@ -1,0 +1,15 @@
+{
+  "files": {
+    "main.css": "/GSflashcards/static/css/main.98524bc4.css",
+    "main.js": "/GSflashcards/static/js/main.e8457c2f.js",
+    "static/js/453.2e33418f.chunk.js": "/GSflashcards/static/js/453.2e33418f.chunk.js",
+    "index.html": "/GSflashcards/index.html",
+    "main.98524bc4.css.map": "/GSflashcards/static/css/main.98524bc4.css.map",
+    "main.e8457c2f.js.map": "/GSflashcards/static/js/main.e8457c2f.js.map",
+    "453.2e33418f.chunk.js.map": "/GSflashcards/static/js/453.2e33418f.chunk.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.98524bc4.css",
+    "static/js/main.e8457c2f.js"
+  ]
+}
