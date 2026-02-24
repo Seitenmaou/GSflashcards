@@ -1,7 +1,7 @@
 {
   "name": "japanesegsflashcard",
   "version": "0.1.0",
-  "homepage": "https://seitenmaou.github.io/japaneseGSflashcards",
+  "homepage": "https://seitenmaou.github.io/GSflashcards",
   "private": true,
   "dependencies": {
     "@testing-library/dom": "^10.4.0",

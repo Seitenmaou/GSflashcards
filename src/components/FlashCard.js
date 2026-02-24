@@ -1,107 +1,84 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import TextSlot from './TextSlot';
-import { toKatakana, toRomaji, toHiragana } from 'wanakana';
+import React, { useState, useEffect, useRef } from 'react';
 
-const SCRIPT_MODES = [
-  { id: 'katakana', label: 'カタ', transform: (value) => toKatakana(value || '') },
-  { id: 'hiragana', label: 'ひら', transform: (value) => toHiragana(value || '') },
-  { id: 'romaji', label: 'RO', transform: (value) => toRomaji(value || '') || value },
-];
-const LONG_PRESS_DELAY = 600;
+const LONG_PRESS_DELAY = 550;
+const DOUBLE_TAP_DELAY = 250;
 
-function FlashCard({ word = '', onNext }) {
-  const characters = useMemo(() => Array.from(word || ''), [word]);
-  const [scriptModes, setScriptModes] = useState([]);
-  const [globalMode, setGlobalMode] = useState(0);
+function FlashCard({ card, onNext, onPrevious }) {
+  const [isFlipped, setIsFlipped] = useState(false);
   const longPressTimeout = useRef(null);
+  const singleTapTimeout = useRef(null);
   const longPressTriggered = useRef(false);
+  const lastTapAt = useRef(0);
 
   useEffect(() => {
-    setScriptModes(Array(characters.length).fill(0));
-    setGlobalMode(0);
-  }, [characters]);
+    setIsFlipped(false);
+  }, [card?.front, card?.back]);
 
   useEffect(() => {
     return () => {
-      if (longPressTimeout.current) {
-        clearTimeout(longPressTimeout.current);
-      }
+      clearTimeout(longPressTimeout.current);
+      clearTimeout(singleTapTimeout.current);
     };
   }, []);
 
-  const cycleSlot = (index) => {
-    setScriptModes((prev) => {
-      if (!prev.length) return prev;
-      const updated = [...prev];
-      updated[index] = (updated[index] + 1) % SCRIPT_MODES.length;
-      return updated;
-    });
-  };
-
-  const handleSlotPress = (index) => {
-    if (longPressTriggered.current) return;
-    cycleSlot(index);
-  };
-
-  const cycleAll = () => {
-    const nextMode = (globalMode + 1) % SCRIPT_MODES.length;
-    setGlobalMode(nextMode);
-    setScriptModes(Array(characters.length).fill(nextMode));
-  };
-
   const startLongPress = () => {
-    if (!characters.length) return;
+    if (!card) return;
     longPressTriggered.current = false;
     clearTimeout(longPressTimeout.current);
     longPressTimeout.current = setTimeout(() => {
       longPressTriggered.current = true;
+      clearTimeout(singleTapTimeout.current);
       if (typeof onNext === 'function') {
         onNext();
       }
     }, LONG_PRESS_DELAY);
   };
 
-  const endLongPress = (event) => {
+  const endPress = () => {
+    if (!card) return;
     clearTimeout(longPressTimeout.current);
     if (longPressTriggered.current) {
       return;
     }
-    const tappedSlot = event.target.closest('[data-slot="true"]');
-    if (!tappedSlot) {
-      cycleAll();
+
+    const now = Date.now();
+    const isDoubleTap = now - lastTapAt.current < DOUBLE_TAP_DELAY;
+
+    if (isDoubleTap) {
+      clearTimeout(singleTapTimeout.current);
+      lastTapAt.current = 0;
+      if (typeof onPrevious === 'function') {
+        onPrevious();
+      }
+      return;
     }
+
+    lastTapAt.current = now;
+    clearTimeout(singleTapTimeout.current);
+    singleTapTimeout.current = setTimeout(() => {
+      setIsFlipped((prev) => !prev);
+      lastTapAt.current = 0;
+    }, DOUBLE_TAP_DELAY);
   };
 
-  const cancelLongPress = () => {
+  const cancelPress = () => {
     clearTimeout(longPressTimeout.current);
   };
 
   return (
     <div
-      className="flash-card"
+      className={`flash-card ${isFlipped ? 'is-flipped' : ''}`}
       onPointerDown={startLongPress}
-      onPointerUp={endLongPress}
-      onPointerLeave={cancelLongPress}
-      onPointerCancel={cancelLongPress}
+      onPointerUp={endPress}
+      onPointerLeave={cancelPress}
+      onPointerCancel={cancelPress}
+      onContextMenu={(event) => event.preventDefault()}
     >
-      <div className="slot-row">
-        {characters.map((char, index) => {
-          const modeIndex = scriptModes[index] ?? 0;
-          const mode = SCRIPT_MODES[modeIndex];
-          const displayValue = mode.transform(char);
-
-          return (
-            <TextSlot
-              key={`${char}-${index}`}
-              value={displayValue}
-              scriptLabel={mode.label}
-              modeId={mode.id}
-              onClick={() => handleSlotPress(index)}
-            />
-          );
-        })}
+      <p className="card-side-label">{isFlipped ? 'Back' : 'Front'}</p>
+      <div className="card-value">
+        {isFlipped ? (card?.back || '') : (card?.front || '')}
       </div>
-      <p className="card-footnote">Tap the blank space to switch every character. Long press to skip.</p>
+      <p className="card-footnote">Tap to flip. Long press: next card. Double tap: previous card.</p>
     </div>
   );
 }

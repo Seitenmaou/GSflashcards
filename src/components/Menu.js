@@ -1,7 +1,7 @@
 import './menu.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export default function Menu({ timeout = 5000, categories, toggledCategories, onToggle }) {
+export default function Menu({ timeout = 5000, decks, selectedDeckLabel, onSelect }) {
   const initialVisible = typeof window !== 'undefined' ? window.innerWidth >= 960 : true;
   const [visible, setVisible] = useState(initialVisible);
   const menuRef = useRef(null);
@@ -106,7 +106,7 @@ export default function Menu({ timeout = 5000, categories, toggledCategories, on
         <div className="menu-header">
           <div>
             <p className="menu-eyebrow">Study sets</p>
-            <h2>Pick categories</h2>
+            <h2>Pick a deck</h2>
           </div>
           <button
             className="close-button"
@@ -116,19 +116,19 @@ export default function Menu({ timeout = 5000, categories, toggledCategories, on
             ×
           </button>
         </div>
-        <p className="menu-subtitle">Toggle one or more decks to build your random pool.</p>
+        <p className="menu-subtitle">Choose one deck to review its cards.</p>
         <ul className="menu-list">
-          {categories.length === 0 && <li className="menu-empty">Loading categories…</li>}
-          {categories.map((category, index) => (
-            <li key={index} className="menu-item">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={toggledCategories.includes(category)}
-                  onChange={() => onToggle(category)}
-                />
-                <span>{category}</span>
-              </label>
+          {decks.length === 0 && <li className="menu-empty">Loading decks…</li>}
+          {decks.map((deck, index) => (
+            <li key={`${deck.label}-${index}`} className="menu-item">
+              <button
+                type="button"
+                className={`menu-choice ${selectedDeckLabel === deck.label ? 'active' : ''}`}
+                onClick={() => onSelect(deck.label)}
+              >
+                <span>{deck.label}</span>
+                <small>{deck.cards.length} cards</small>
+              </button>
             </li>
           ))}
         </ul>

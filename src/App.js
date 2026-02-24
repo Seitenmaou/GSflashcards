@@ -3,108 +3,109 @@ import { useState, useEffect, useMemo } from 'react';
 import Menu from './components/Menu';
 import FlashCard from './components/FlashCard';
 
-const googleSheetsApi = 'https://script.google.com/macros/s/AKfycbyKeLFla2mIBQEBQCCwoXJdFQ9QvEBeV9mRQh3RY6RLyzOAexNHceRgWGvZJwMLr-iK/exec';
+const googleSheetsApi = 'https://script.google.com/macros/s/AKfycbw9eyQPQ39enZaVVH8bHZk92lCYSx-9_LsBBup8Inx-J_DE6nJyE1rjZ0h_SFSZjV0/exec';
 
 function App() {
-  const [data, setData] = useState({});
-  const [categories, setCategories] = useState([]);
-  const [toggledCategories, setToggledCategories] = useState([]);
-  const [randomPool, setRandomPool] = useState([]);
+  const [decks, setDecks] = useState([]);
+  const [selectedDeckLabel, setSelectedDeckLabel] = useState('');
   const [index, setIndex] = useState(0);
 
   const handleNext = () => {
-    if (randomPool.length === 0) return;
-    setIndex((prevIndex) => (prevIndex + 1) % randomPool.length);
+    const currentDeck = decks.find((deck) => deck.label === selectedDeckLabel);
+    const cards = currentDeck?.cards || [];
+    if (cards.length === 0) return;
+    setIndex((prevIndex) => (prevIndex + 1) % cards.length);
   };
 
-  const handleToggle = (item) => {
-    setToggledCategories((prev) =>
-      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
-    );
+  const handlePrevious = () => {
+    const currentDeck = decks.find((deck) => deck.label === selectedDeckLabel);
+    const cards = currentDeck?.cards || [];
+    if (cards.length === 0) return;
+    setIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
   };
-
-  useEffect(() => {
-    const combined = toggledCategories.flatMap((cat) => data[cat] || []);
-    const shuffled = combined
-      .map((value) => ({ value, sort: Math.random() }))
-      .sort((a, b) => a.sort - b.sort)
-      .map(({ value }) => value);
-    setRandomPool(shuffled);
-    setIndex(0); // reset to first card on category change
-  }, [toggledCategories, data]);
 
   useEffect(() => {
     fetch(googleSheetsApi)
       .then((res) => res.json())
-      .then((data) => {
-        for (let key in data) {
-          if (Array.isArray(data[key])) {
-            data[key] = data[key].filter((item) => item !== '');
-          }
-        }
-        setData(data);
+      .then((payload) => {
+        const nextDecks = Array.isArray(payload?.decks)
+          ? payload.decks
+              .map((deck) => ({
+                label: deck?.label || 'Untitled Deck',
+                cards: Array.isArray(deck?.cards)
+                  ? deck.cards.filter((card) => card?.front || card?.back)
+                  : [],
+              }))
+              .filter((deck) => deck.cards.length > 0)
+          : [];
+        setDecks(nextDecks);
+        setSelectedDeckLabel(nextDecks[0]?.label || '');
       })
       .catch((err) => console.error('Error fetching data:', err));
   }, []);
 
   useEffect(() => {
-    setCategories(Object.keys(data));
-  }, [data]);
+    setIndex(0);
+  }, [selectedDeckLabel]);
 
-  const currentWord = useMemo(() => randomPool[index], [randomPool, index]);
-  const hasSelection = randomPool.length > 0;
+  const selectedDeck = useMemo(
+    () => decks.find((deck) => deck.label === selectedDeckLabel),
+    [decks, selectedDeckLabel]
+  );
+  const cards = useMemo(() => selectedDeck?.cards || [], [selectedDeck]);
+  const currentCard = useMemo(() => cards[index], [cards, index]);
+  const hasSelection = cards.length > 0;
 
   return (
     <div className="App app-shell">
       <Menu
         timeout={5000}
-        categories={categories}
-        toggledCategories={toggledCategories}
-        onToggle={handleToggle}
+        decks={decks}
+        selectedDeckLabel={selectedDeckLabel}
+        onSelect={setSelectedDeckLabel}
       />
       <main className="workspace">
         <header className="hero">
           <p className="eyebrow">Study anywhere</p>
-          <h1>Japanese Flash Cards</h1>
+          <h1>Flash Cards</h1>
           <p className="hero-copy">
-            Choose a category from the menu, then tap through the characters. The experience adapts for desktop,
-            tablet, and phone so you can drill vocab wherever you are.
+            Pick a deck from the menu and review cards with simple gestures. Works on desktop, tablet, and phone.
           </p>
         </header>
 
         {hasSelection ? (
           <section className="card-stage">
-            <FlashCard word={currentWord} onNext={handleNext} />
+            <FlashCard card={currentCard} onNext={handleNext} onPrevious={handlePrevious} />
             <div className="card-actions">
               <div className="action-card">
-                <span className="action-emoji" aria-hidden="true">👉</span>
+                <span className="action-emoji" aria-hidden="true">👆</span>
                 <div>
-                  <strong>Tap a letter</strong>
-                  <p>Cycle Katakana → Hiragana → Romaji per character.</p>
-                </div>
-              </div>
-              <div className="action-card">
-                <span className="action-emoji" aria-hidden="true">🀄</span>
-                <div>
-                  <strong>Tap the card</strong>
-                  <p>Cycle every letter at once when you tap the card background.</p>
+                  <strong>Tap</strong>
+                  <p>Flip the card between front and back.</p>
                 </div>
               </div>
               <div className="action-card">
                 <span className="action-emoji" aria-hidden="true">⏩</span>
                 <div>
-                  <strong>Press &amp; hold</strong>
-                  <p>Hold for a moment anywhere on the card to jump to the next word.</p>
+                  <strong>Long press</strong>
+                  <p>Go to the next card in the selected deck.</p>
+                </div>
+              </div>
+              <div className="action-card">
+                <span className="action-emoji" aria-hidden="true">⏪</span>
+                <div>
+                  <strong>Double tap</strong>
+                  <p>Return to the previous card.</p>
                 </div>
               </div>
             </div>
           </section>
         ) : (
           <section className="empty-state">
-            <h2>Select a category to begin</h2>
+            <h2>Select a deck to begin</h2>
             <p>
-              Use the menu button to choose at least one category. Your flash cards will appear here and
-              adapt automatically for touch, pen, or mouse.
+              Use the menu button to choose a deck. Cards from that deck will appear here and respond to touch,
+              pen, or mouse gestures.
             </p>
           </section>
         )}
