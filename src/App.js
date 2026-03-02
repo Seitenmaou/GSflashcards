@@ -3,25 +3,98 @@ import { useState, useEffect, useMemo } from 'react';
 import Menu from './components/Menu';
 import FlashCard from './components/FlashCard';
 
-const googleSheetsApi = 'https://script.google.com/macros/s/AKfycbw9eyQPQ39enZaVVH8bHZk92lCYSx-9_LsBBup8Inx-J_DE6nJyE1rjZ0h_SFSZjV0/exec';
+const googleSheetsApi = 'https://script.google.com/macros/s/AKfycbw9RZf2p5DGRaZfUF6gKB-bRIRjNPTcSpkvZ6gnjvHKRxKwIX8EkBS8LD4GcWjXK6k/exec';
+
+function normalizeCell(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+
+  return String(value).trim();
+}
+
+function buildCardsFromRow(row) {
+  const cells = Array.isArray(row)
+    ? row.map(normalizeCell)
+    : Object.values(row || {}).map(normalizeCell);
+  const cards = [];
+
+  for (let index = 0; index < cells.length; index += 3) {
+    const front = cells[index];
+    const backLeft = cells[index + 1];
+    const backRight = cells[index + 2];
+
+    if (!front || !backLeft) {
+      continue;
+    }
+
+    cards.push({
+      front,
+      backLeft,
+      backRight: backRight || '',
+      hasSplitBack: Boolean(backRight),
+    });
+  }
+
+  return cards;
+}
+
+function buildDeckCards(sourceCards) {
+  if (!Array.isArray(sourceCards)) {
+    return [];
+  }
+
+  return sourceCards.flatMap((entry) => {
+    if (Array.isArray(entry)) {
+      return buildCardsFromRow(entry);
+    }
+
+    if (entry && typeof entry === 'object' && !('front' in entry)) {
+      return buildCardsFromRow(entry);
+    }
+
+    if (!entry?.front || !entry?.back) {
+      return [];
+    }
+
+    return [
+      {
+        front: normalizeCell(entry.front),
+        backLeft: normalizeCell(entry.back),
+        backRight: normalizeCell(entry.extra),
+        hasSplitBack: Boolean(normalizeCell(entry.extra)),
+      },
+    ];
+  });
+}
+
+function shuffleCards(cards) {
+  return [...cards]
+    .map((card) => ({ card, sort: Math.random() }))
+    .sort((left, right) => left.sort - right.sort)
+    .map(({ card }) => card);
+}
 
 function App() {
   const [decks, setDecks] = useState([]);
-  const [selectedDeckLabel, setSelectedDeckLabel] = useState('');
+  const [selectedDeckLabels, setSelectedDeckLabels] = useState([]);
+  const [activeCards, setActiveCards] = useState([]);
   const [index, setIndex] = useState(0);
 
   const handleNext = () => {
-    const currentDeck = decks.find((deck) => deck.label === selectedDeckLabel);
-    const cards = currentDeck?.cards || [];
-    if (cards.length === 0) return;
-    setIndex((prevIndex) => (prevIndex + 1) % cards.length);
+    if (activeCards.length === 0) return;
+    setIndex((prevIndex) => (prevIndex + 1) % activeCards.length);
   };
 
   const handlePrevious = () => {
-    const currentDeck = decks.find((deck) => deck.label === selectedDeckLabel);
-    const cards = currentDeck?.cards || [];
-    if (cards.length === 0) return;
-    setIndex((prevIndex) => (prevIndex - 1 + cards.length) % cards.length);
+    if (activeCards.length === 0) return;
+    setIndex((prevIndex) => (prevIndex - 1 + activeCards.length) % activeCards.length);
+  };
+
+  const handleToggleDeck = (label) => {
+    setSelectedDeckLabels((prev) =>
+      prev.includes(label) ? prev.filter((item) => item !== label) : [...prev, label]
+    );
   };
 
   useEffect(() => {
@@ -32,37 +105,34 @@ function App() {
           ? payload.decks
               .map((deck) => ({
                 label: deck?.label || 'Untitled Deck',
-                cards: Array.isArray(deck?.cards)
-                  ? deck.cards.filter((card) => card?.front || card?.back)
-                  : [],
+                cards: buildDeckCards(deck?.cards),
               }))
               .filter((deck) => deck.cards.length > 0)
           : [];
         setDecks(nextDecks);
-        setSelectedDeckLabel(nextDecks[0]?.label || '');
+        setSelectedDeckLabels(nextDecks[0]?.label ? [nextDecks[0].label] : []);
       })
       .catch((err) => console.error('Error fetching data:', err));
   }, []);
 
   useEffect(() => {
+    const mixedCards = decks
+      .filter((deck) => selectedDeckLabels.includes(deck.label))
+      .flatMap((deck) => deck.cards);
+    setActiveCards(shuffleCards(mixedCards));
     setIndex(0);
-  }, [selectedDeckLabel]);
+  }, [decks, selectedDeckLabels]);
 
-  const selectedDeck = useMemo(
-    () => decks.find((deck) => deck.label === selectedDeckLabel),
-    [decks, selectedDeckLabel]
-  );
-  const cards = useMemo(() => selectedDeck?.cards || [], [selectedDeck]);
-  const currentCard = useMemo(() => cards[index], [cards, index]);
-  const hasSelection = cards.length > 0;
+  const currentCard = useMemo(() => activeCards[index], [activeCards, index]);
+  const hasSelection = activeCards.length > 0;
 
   return (
     <div className="App app-shell">
       <Menu
         timeout={5000}
         decks={decks}
-        selectedDeckLabel={selectedDeckLabel}
-        onSelect={setSelectedDeckLabel}
+        selectedDeckLabels={selectedDeckLabels}
+        onToggle={handleToggleDeck}
       />
       <main className="workspace">
         <header className="hero">
@@ -88,7 +158,7 @@ function App() {
                 <span className="action-emoji" aria-hidden="true">⏩</span>
                 <div>
                   <strong>Long press</strong>
-                  <p>Go to the next card in the selected deck.</p>
+                  <p>Go to the next card in the shuffled study pool.</p>
                 </div>
               </div>
               <div className="action-card">
@@ -102,10 +172,10 @@ function App() {
           </section>
         ) : (
           <section className="empty-state">
-            <h2>Select a deck to begin</h2>
+            <h2>Select at least one deck to begin</h2>
             <p>
-              Use the menu button to choose a deck. Cards from that deck will appear here and respond to touch,
-              pen, or mouse gestures.
+              Use the menu button to choose one or more decks. Cards from those decks will be mixed together and
+              respond to touch, pen, or mouse gestures.
             </p>
           </section>
         )}

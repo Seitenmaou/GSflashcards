@@ -12,7 +12,7 @@ function FlashCard({ card, onNext, onPrevious }) {
 
   useEffect(() => {
     setIsFlipped(false);
-  }, [card?.front, card?.back]);
+  }, [card?.front, card?.backLeft, card?.backRight]);
 
   useEffect(() => {
     return () => {
@@ -75,9 +75,14 @@ function FlashCard({ card, onNext, onPrevious }) {
       onContextMenu={(event) => event.preventDefault()}
     >
       <p className="card-side-label">{isFlipped ? 'Back' : 'Front'}</p>
-      <div className="card-value">
-        {isFlipped ? (card?.back || '') : (card?.front || '')}
-      </div>
+      {isFlipped ? (
+        <div className={`card-value card-back ${card?.hasSplitBack ? 'card-back-split' : ''}`}>
+          <div className="card-back-panel card-back-left">{card?.backLeft || ''}</div>
+          {card?.hasSplitBack && <div className="card-back-panel card-back-right">{card?.backRight || ''}</div>}
+        </div>
+      ) : (
+        <div className="card-value">{card?.front || ''}</div>
+      )}
       <p className="card-footnote">Tap to flip. Long press: next card. Double tap: previous card.</p>
     </div>
   );

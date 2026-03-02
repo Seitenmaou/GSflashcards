@@ -1,7 +1,7 @@
 import './menu.css';
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-export default function Menu({ timeout = 5000, decks, selectedDeckLabel, onSelect }) {
+export default function Menu({ timeout = 5000, decks, selectedDeckLabels, onToggle }) {
   const initialVisible = typeof window !== 'undefined' ? window.innerWidth >= 960 : true;
   const [visible, setVisible] = useState(initialVisible);
   const menuRef = useRef(null);
@@ -106,7 +106,7 @@ export default function Menu({ timeout = 5000, decks, selectedDeckLabel, onSelec
         <div className="menu-header">
           <div>
             <p className="menu-eyebrow">Study sets</p>
-            <h2>Pick a deck</h2>
+            <h2>Pick decks</h2>
           </div>
           <button
             className="close-button"
@@ -116,19 +116,22 @@ export default function Menu({ timeout = 5000, decks, selectedDeckLabel, onSelec
             ×
           </button>
         </div>
-        <p className="menu-subtitle">Choose one deck to review its cards.</p>
+        <p className="menu-subtitle">Choose one or more decks to build a mixed study pool.</p>
         <ul className="menu-list">
           {decks.length === 0 && <li className="menu-empty">Loading decks…</li>}
           {decks.map((deck, index) => (
             <li key={`${deck.label}-${index}`} className="menu-item">
-              <button
-                type="button"
-                className={`menu-choice ${selectedDeckLabel === deck.label ? 'active' : ''}`}
-                onClick={() => onSelect(deck.label)}
-              >
-                <span>{deck.label}</span>
+              <label className={`menu-choice ${selectedDeckLabels.includes(deck.label) ? 'active' : ''}`}>
+                <span className="menu-choice-main">
+                  <input
+                    type="checkbox"
+                    checked={selectedDeckLabels.includes(deck.label)}
+                    onChange={() => onToggle(deck.label)}
+                  />
+                  <span>{deck.label}</span>
+                </span>
                 <small>{deck.cards.length} cards</small>
-              </button>
+              </label>
             </li>
           ))}
         </ul>
